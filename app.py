@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+from flasgger import Swagger
 from flask import Flask, render_template, session
 
 import models
@@ -27,6 +28,35 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(shop_bp)
 app.register_blueprint(api_orders_bp)
 app.register_blueprint(api_products_bp)
+
+swagger = Swagger(
+    app,
+    config={
+        'headers': [],
+        'specs': [
+            {
+                'endpoint': 'api_spec',
+                'route': '/apispec_1.json',
+                'rule_filter': lambda rule: rule.rule.startswith(('/api/v1/', '/api/v2/')),
+                'model_filter': lambda tag: True,
+            }
+        ],
+        'swagger_ui': True,
+        'specs_route': '/apidocs/',
+    },
+    template={
+        'swagger': '2.0',
+        'info': {
+            'title': 'AVANGARD SHOP API',
+            'description': 'REST API магазину AVANGARD SHOP, версії v1 та v2.',
+            'version': '1.0.0',
+        },
+        'basePath': '/',
+        'schemes': ['http'],
+        'consumes': ['application/json'],
+        'produces': ['application/json'],
+    },
+)
 
 
 @app.template_filter('money')
