@@ -1,5 +1,6 @@
 import re
 
+from flasgger import swag_from
 from flask import Blueprint, request
 
 import models
@@ -11,6 +12,230 @@ api_orders_bp = Blueprint('api_orders', __name__, url_prefix='/api')
 
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 MAX_ORDER_ITEMS = 50
+
+ORDER_ITEM_SCHEMA = {
+    'type': 'object',
+    'required': ['name', 'quantity', 'unit_price', 'subtotal'],
+    'properties': {
+        'name': {'type': 'string', 'example': 'Ігровий ноутбук'},
+        'quantity': {'type': 'integer', 'example': 1},
+        'unit_price': {'type': 'number', 'example': 54999.0},
+        'subtotal': {'type': 'number', 'example': 54999.0},
+    },
+}
+
+ORDER_SUMMARY_SCHEMA = {
+    'type': 'object',
+    'required': ['id', 'customer_name', 'email', 'address', 'total_price', 'status', 'created_at'],
+    'properties': {
+        'id': {'type': 'integer', 'example': 1},
+        'client_id': {'type': 'integer', 'example': 1},
+        'customer_name': {'type': 'string', 'example': 'Тестовий Покупець'},
+        'email': {'type': 'string', 'format': 'email', 'example': 'buyer@example.com'},
+        'address': {'type': 'string', 'example': 'Київ, вул. Хрещатик, 1'},
+        'total_price': {'type': 'number', 'example': 54999.0},
+        'promo_code': {'type': 'string', 'example': ''},
+        'discount_amount': {'type': 'number', 'example': 0},
+        'status': {'type': 'string', 'enum': list(models.ORDER_STATUSES), 'example': 'Нове'},
+        'created_at': {'type': 'string', 'example': '2026-11-16 12:00:00'},
+    },
+}
+
+ORDER_DETAIL_SCHEMA = {
+    **ORDER_SUMMARY_SCHEMA,
+    'properties': {
+        **ORDER_SUMMARY_SCHEMA['properties'],
+        'items': {'type': 'array', 'items': ORDER_ITEM_SCHEMA},
+    },
+}
+
+ORDER_INPUT_SCHEMA = {
+    'type': 'object',
+    'required': ['customer_name', 'email', 'address', 'items'],
+    'properties': {
+        'customer_name': {'type': 'string', 'example': 'Тестовий Покупець'},
+        'email': {'type': 'string', 'format': 'email', 'example': 'buyer@example.com'},
+        'address': {'type': 'string', 'example': 'Київ, вул. Хрещатик, 1'},
+        'items': {
+            'type': 'array',
+            'minItems': 1,
+            'maxItems': MAX_ORDER_ITEMS,
+            'items': {
+                'type': 'object',
+                'required': ['product_id', 'quantity'],
+                'properties': {
+                    'product_id': {'type': 'integer', 'minimum': 1, 'example': 1},
+                    'quantity': {
+                        'type': 'integer', 'minimum': 1, 'maximum': MAX_QUANTITY, 'example': 1,
+                    },
+                },
+            },
+        },
+        'promo_code': {'type': 'string', 'example': 'WELCOME10'},
+    },
+}
+
+ORDER_EXAMPLE = {
+    'id': 1,
+    'client_id': 1,
+    'customer_name': 'Тестовий Покупець',
+    'email': 'buyer@example.com',
+    'address': 'Київ, вул. Хрещатик, 1',
+    'total_price': 54999.0,
+    'promo_code': '',
+    'discount_amount': 0,
+    'status': 'Нове',
+    'created_at': '2026-11-16 12:00:00',
+}
+
+ORDER_DETAIL_EXAMPLE = {
+    **ORDER_EXAMPLE,
+    'items': [
+        {'name': 'Ігровий ноутбук', 'quantity': 1, 'unit_price': 54999.0, 'subtotal': 54999.0}
+    ],
+}
+
+
+def _versioned_schema(version, data_schema):
+    if version == 'v1':
+        return data_schema
+    return {
+        'type': 'object',
+        'required': ['version', 'data'],
+        'properties': {
+            'version': {'type': 'string', 'enum': ['v2']},
+            'data': data_schema,
+        },
+    }
+
+
+def _success_spec(version, description, data_schema, example):
+    response_example = example
+    if version == 'v2':
+        response_example = {'version': 'v2', 'data': example}
+    return {
+        'description': description,
+        'schema': _versioned_schema(version, data_schema),
+        'examples': {'application/json': response_example},
+    }
+
+
+def _error_spec(version, description, message, details=None):
+    if version == 'v2':
+        schema = {
+            'type': 'object',
+            'required': ['version', 'error'],
+            'properties': {
+                'version': {'type': 'string', 'enum': ['v2']},
+                'error': {
+                    'type': 'object',
+                    'required': ['message'],
+                    'properties': {
+                        'message': {'type': 'string'},
+                        'details': {'type': 'object'},
+                    },
+                },
+            },
+        }
+        example = {'version': 'v2', 'error': {'message': message}}
+        if details is not None:
+            example['error']['details'] = details
+    else:
+        schema = {
+            'type': 'object',
+            'required': ['error'],
+            'properties': {
+                'error': {'type': 'string'},
+                'details': {'type': 'object'},
+            },
+        }
+        example = {'error': message}
+        if details is not None:
+            example['details'] = details
+    return {
+        'description': description,
+        'schema': schema,
+        'examples': {'application/json': example},
+    }
+
+
+def _operation_spec(version, summary, parameters, responses):
+    return {
+        'tags': ['Замовлення'],
+        'summary': summary,
+        'description': f'Версія {version} API. Успішна відповідь і помилки мають формат цієї версії.',
+        'parameters': parameters,
+        'responses': responses,
+        'produces': ['application/json'],
+    }
+
+
+def _list_orders_spec(version):
+    order_list_schema = {'type': 'array', 'items': ORDER_SUMMARY_SCHEMA}
+    order_list_example = [ORDER_EXAMPLE]
+    return _operation_spec(
+        version,
+        'Отримати список замовлень',
+        [],
+        {
+            200: _success_spec(version, 'Список замовлень від нових до старих.', order_list_schema, order_list_example),
+        },
+    )
+
+
+def _get_order_spec(version):
+    return _operation_spec(
+        version,
+        'Отримати замовлення з товарами',
+        [{'name': 'order_id', 'in': 'path', 'type': 'integer', 'required': True}],
+        {
+            200: _success_spec(version, 'Замовлення та його позиції.', ORDER_DETAIL_SCHEMA, ORDER_DETAIL_EXAMPLE),
+            404: _error_spec(version, 'Замовлення не знайдено.', 'Замовлення не знайдено.'),
+        },
+    )
+
+
+def _create_order_spec(version):
+    return _operation_spec(
+        version,
+        'Створити замовлення',
+        [{'name': 'body', 'in': 'body', 'required': True, 'schema': ORDER_INPUT_SCHEMA}],
+        {
+            201: _success_spec(version, 'Замовлення створено.', ORDER_DETAIL_SCHEMA, ORDER_DETAIL_EXAMPLE),
+            400: _error_spec(
+                version, 'Некоректні дані або товар не знайдено.',
+                'Некоректні дані замовлення.', {'items': 'Перевірте наявність товарів та їхню кількість.'},
+            ),
+            409: _error_spec(
+                version, 'Один або кілька товарів недоступні.',
+                'Одного або кількох товарів немає в наявності.', {'product_ids': [1]},
+            ),
+        },
+    )
+
+
+def _update_order_status_spec(version):
+    status_input_schema = {
+        'type': 'object',
+        'required': ['status'],
+        'properties': {'status': {'type': 'string', 'enum': list(models.ORDER_STATUSES)}},
+    }
+    return _operation_spec(
+        version,
+        'Змінити статус замовлення',
+        [
+            {'name': 'order_id', 'in': 'path', 'type': 'integer', 'required': True},
+            {'name': 'body', 'in': 'body', 'required': True, 'schema': status_input_schema},
+        ],
+        {
+            200: _success_spec(version, 'Статус замовлення змінено.', ORDER_DETAIL_SCHEMA, ORDER_DETAIL_EXAMPLE),
+            400: _error_spec(
+                version, 'Невідомий статус.', 'Невідомий статус замовлення.',
+                {'allowed_statuses': list(models.ORDER_STATUSES)},
+            ),
+            404: _error_spec(version, 'Замовлення не знайдено.', 'Замовлення не знайдено.'),
+        },
+    )
 
 
 def _order_to_dict(order, items=None):
@@ -95,27 +320,42 @@ def _read_order_data(data):
     }, None
 
 
-@api_orders_bp.get('/v1/orders')
-@api_orders_bp.get('/v2/orders')
-def list_orders():
-    """Return all orders, newest first."""
+def _list_orders():
     return api_response([_order_to_dict(order) for order in models.get_orders()])
 
 
-@api_orders_bp.get('/v1/orders/<int:order_id>')
-@api_orders_bp.get('/v2/orders/<int:order_id>')
-def get_order(order_id):
-    """Return one order and its product line items."""
+@api_orders_bp.get('/v1/orders', endpoint='list_orders_v1')
+@swag_from(_list_orders_spec('v1'))
+def list_orders_v1():
+    return _list_orders()
+
+
+@api_orders_bp.get('/v2/orders', endpoint='list_orders_v2')
+@swag_from(_list_orders_spec('v2'))
+def list_orders_v2():
+    return _list_orders()
+
+
+def _get_order(order_id):
     order, items = models.get_order_details(order_id)
     if order is None:
         return api_error('Замовлення не знайдено.', 404)
     return api_response(_order_to_dict(order, items))
 
 
-@api_orders_bp.post('/v1/orders')
-@api_orders_bp.post('/v2/orders')
-def create_order():
-    """Create an order from customer details and a list of product quantities."""
+@api_orders_bp.get('/v1/orders/<int:order_id>', endpoint='get_order_v1')
+@swag_from(_get_order_spec('v1'))
+def get_order_v1(order_id):
+    return _get_order(order_id)
+
+
+@api_orders_bp.get('/v2/orders/<int:order_id>', endpoint='get_order_v2')
+@swag_from(_get_order_spec('v2'))
+def get_order_v2(order_id):
+    return _get_order(order_id)
+
+
+def _create_order():
     data, errors = _read_order_data(request.get_json(silent=True))
     if errors:
         return api_error('Некоректні дані замовлення.', 400, errors)
@@ -160,10 +400,19 @@ def create_order():
     return response, status
 
 
-@api_orders_bp.patch('/v1/orders/<int:order_id>')
-@api_orders_bp.patch('/v2/orders/<int:order_id>')
-def update_order_status(order_id):
-    """Change an order's status without replacing the rest of the order."""
+@api_orders_bp.post('/v1/orders', endpoint='create_order_v1')
+@swag_from(_create_order_spec('v1'))
+def create_order_v1():
+    return _create_order()
+
+
+@api_orders_bp.post('/v2/orders', endpoint='create_order_v2')
+@swag_from(_create_order_spec('v2'))
+def create_order_v2():
+    return _create_order()
+
+
+def _update_order_status(order_id):
     order = models.get_order(order_id)
     if order is None:
         return api_error('Замовлення не знайдено.', 404)
@@ -180,3 +429,15 @@ def update_order_status(order_id):
     models.update_order_status(order_id, status)
     updated_order, items = models.get_order_details(order_id)
     return api_response(_order_to_dict(updated_order, items))
+
+
+@api_orders_bp.patch('/v1/orders/<int:order_id>', endpoint='update_order_status_v1')
+@swag_from(_update_order_status_spec('v1'))
+def update_order_status_v1(order_id):
+    return _update_order_status(order_id)
+
+
+@api_orders_bp.patch('/v2/orders/<int:order_id>', endpoint='update_order_status_v2')
+@swag_from(_update_order_status_spec('v2'))
+def update_order_status_v2(order_id):
+    return _update_order_status(order_id)
