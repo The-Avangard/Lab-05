@@ -5,6 +5,7 @@ from flask import Flask, render_template, session
 
 import models
 from routes import admin_bp, feedback_bp, shop_bp
+from routes.api_orders import api_orders_bp
 from routes.api_products import api_products_bp
 
 
@@ -24,6 +25,7 @@ with app.app_context():
 app.register_blueprint(feedback_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(shop_bp)
+app.register_blueprint(api_orders_bp)
 app.register_blueprint(api_products_bp)
 
 
