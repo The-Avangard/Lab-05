@@ -33,6 +33,8 @@ swagger = Swagger(
     app,
     config={
         'headers': [],
+        'auth': {},
+        'static_url_path': '/flasgger_static',
         'specs': [
             {
                 'endpoint': 'api_spec',
