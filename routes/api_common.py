@@ -1,6 +1,9 @@
 from flask import jsonify, request
 
 
+MAX_SQLITE_ID = (1 << 63) - 1
+
+
 def _is_v2_request():
     """Return True when the current request uses the v2 URL prefix."""
     return request.path.startswith('/api/v2/')

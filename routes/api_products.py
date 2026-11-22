@@ -7,7 +7,7 @@ from flasgger import swag_from
 from flask import Blueprint, request
 
 import models
-from .api_common import api_error, api_response
+from .api_common import MAX_SQLITE_ID, api_error, api_response
 
 
 api_products_bp = Blueprint('api_products', __name__, url_prefix='/api')
@@ -282,10 +282,16 @@ def _validate_product_data(data):
     price = data.get('price')
     if isinstance(price, bool) or not isinstance(price, (int, float)):
         errors['price'] = 'Ціна має бути числом.'
-    elif not math.isfinite(price) or price < 0:
-        errors['price'] = 'Ціна має бути скінченним числом не меншим за 0.'
     else:
-        result['price'] = float(price)
+        try:
+            normalized_price = float(price)
+        except OverflowError:
+            errors['price'] = 'Ціна має бути скінченним числом не меншим за 0.'
+        else:
+            if not math.isfinite(normalized_price) or normalized_price < 0:
+                errors['price'] = 'Ціна має бути скінченним числом не меншим за 0.'
+            else:
+                result['price'] = normalized_price
 
     if errors:
         return None, errors
@@ -320,6 +326,9 @@ def list_products_v2():
 
 
 def _get_product(product_id):
+    if product_id > MAX_SQLITE_ID:
+        return api_error('Товар не знайдено.', 404)
+
     product = models.get_product(product_id)
     if product is None:
         return api_error('Товар не знайдено.', 404)
@@ -368,6 +377,9 @@ def create_product_v2():
 
 
 def _replace_product(product_id):
+    if product_id > MAX_SQLITE_ID:
+        return api_error('Товар не знайдено.', 404)
+
     if models.get_product(product_id) is None:
         return api_error('Товар не знайдено.', 404)
 
@@ -400,6 +412,9 @@ def replace_product_v2(product_id):
 
 
 def _remove_product(product_id):
+    if product_id > MAX_SQLITE_ID:
+        return api_error('Товар не знайдено.', 404)
+
     if models.get_product(product_id) is None:
         return api_error('Товар не знайдено.', 404)
 

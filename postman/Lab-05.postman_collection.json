@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "AVANGARD SHOP — Lab 05 API",
-    "description": "Postman collection for the versioned products and orders API. Run the v1 and v2 folders against the local Flask server.",
+    "description": "Postman collection for the versioned products and orders API. Each endpoint has successful and error scenarios for v1 and v2.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "51aafdbf-4712-43fa-8be8-9a7e8880af43",
     "version": {
@@ -524,6 +524,166 @@
               "listen": "test"
             }
           ]
+        },
+        {
+          "name": "Products — reject invalid category filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/products?category=invalid-category",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "invalid-category"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products — reject update for missing ID",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/products/999999",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v1",
+                "products",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products — reject delete for missing ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/products/999999",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v1",
+                "products",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Orders — reject invalid status filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/orders?status=invalid-status",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "invalid-status"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Orders — reject missing ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/orders/999999",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1020,6 +1180,166 @@
                 ]
               },
               "listen": "test"
+            }
+          ]
+        },
+        {
+          "name": "Products — reject invalid category filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v2/products?category=invalid-category",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v2",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "invalid-category"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products — reject update for missing ID",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v2/products/999999",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v2",
+                "products",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products — reject delete for missing ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v2/products/999999",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v2",
+                "products",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Orders — reject invalid status filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v2/orders?status=invalid-status",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v2",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "invalid-status"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Orders — reject missing ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v2/orders/999999",
+              "host": [
+                "{{{{base_url}}}}"
+              ],
+              "path": [
+                "v2",
+                "orders",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Response is JSON\", () => pm.response.to.be.json);"
+                ]
+              }
             }
           ]
         }

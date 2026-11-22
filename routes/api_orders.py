@@ -4,7 +4,7 @@ from flasgger import swag_from
 from flask import Blueprint, request
 
 import models
-from .api_common import api_error, api_response
+from .api_common import MAX_SQLITE_ID, api_error, api_response
 from .shop import MAX_QUANTITY
 
 
@@ -64,7 +64,9 @@ ORDER_INPUT_SCHEMA = {
                 'type': 'object',
                 'required': ['product_id', 'quantity'],
                 'properties': {
-                    'product_id': {'type': 'integer', 'minimum': 1, 'example': 1},
+                    'product_id': {
+                        'type': 'integer', 'minimum': 1, 'maximum': MAX_SQLITE_ID, 'example': 1,
+                    },
                     'quantity': {
                         'type': 'integer', 'minimum': 1, 'maximum': MAX_QUANTITY, 'example': 1,
                     },
@@ -176,9 +178,20 @@ def _list_orders_spec(version):
     return _operation_spec(
         version,
         'Отримати список замовлень',
-        [],
+        [{
+            'name': 'status',
+            'in': 'query',
+            'type': 'string',
+            'required': False,
+            'enum': list(models.ORDER_STATUSES),
+            'description': 'Необов’язковий фільтр за статусом замовлення.',
+        }],
         {
             200: _success_spec(version, 'Список замовлень від нових до старих.', order_list_schema, order_list_example),
+            400: _error_spec(
+                version, 'Невідомий статус фільтра.', 'Невідомий статус замовлення.',
+                {'allowed_statuses': list(models.ORDER_STATUSES)},
+            ),
         },
     )
 
@@ -284,8 +297,14 @@ def _read_order_data(data):
 
             product_id = item.get('product_id')
             quantity = item.get('quantity')
-            if isinstance(product_id, bool) or not isinstance(product_id, int) or product_id <= 0:
-                errors[f'{item_key}.product_id'] = 'ID товару має бути додатним цілим числом.'
+            if (
+                isinstance(product_id, bool)
+                or not isinstance(product_id, int)
+                or not 1 <= product_id <= MAX_SQLITE_ID
+            ):
+                errors[f'{item_key}.product_id'] = (
+                    'ID товару має бути додатним цілим числом у допустимому діапазоні.'
+                )
                 continue
             if isinstance(quantity, bool) or not isinstance(quantity, int):
                 errors[f'{item_key}.quantity'] = 'Кількість має бути цілим числом.'
@@ -321,7 +340,18 @@ def _read_order_data(data):
 
 
 def _list_orders():
-    return api_response([_order_to_dict(order) for order in models.get_orders()])
+    status = request.args.get('status', '').strip()
+    if status and status not in models.ORDER_STATUSES:
+        return api_error(
+            'Невідомий статус замовлення.',
+            400,
+            {'allowed_statuses': list(models.ORDER_STATUSES)},
+        )
+
+    orders = models.get_orders()
+    if status:
+        orders = [order for order in orders if order['status'] == status]
+    return api_response([_order_to_dict(order) for order in orders])
 
 
 @api_orders_bp.get('/v1/orders', endpoint='list_orders_v1')
@@ -337,6 +367,9 @@ def list_orders_v2():
 
 
 def _get_order(order_id):
+    if order_id > MAX_SQLITE_ID:
+        return api_error('Замовлення не знайдено.', 404)
+
     order, items = models.get_order_details(order_id)
     if order is None:
         return api_error('Замовлення не знайдено.', 404)
@@ -413,6 +446,9 @@ def create_order_v2():
 
 
 def _update_order_status(order_id):
+    if order_id > MAX_SQLITE_ID:
+        return api_error('Замовлення не знайдено.', 404)
+
     order = models.get_order(order_id)
     if order is None:
         return api_error('Замовлення не знайдено.', 404)
